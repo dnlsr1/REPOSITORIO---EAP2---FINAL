@@ -1,0 +1,721 @@
+---
+title: "ENTREGABLE 3 "
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r}
+#liberías
+library(ggplot2)
+library(flexdashboard)
+library(shiny)
+library(jsonlite)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(purrr)
+library(plotly)
+library(stargazer)
+library(sjPlot)
+library(scraEP)
+library(corrplot)
+```
+
+```{r}
+#data
+library(modelsummary)
+library(rio)
+```
+
+```{r}
+# Si usas análisis de supervivencia
+library(tidyverse)
+library(lmtest)
+library(survival)  
+library(survminer) 
+```
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+#importamos data
+dataza2020 = import("DATAZA2020.xlsx")
+library(tidyverse)
+```
+
+```{r}
+dataza2020 <- na.omit(dataza2020)
+```
+
+```{r}
+numerica2020 = c("PBI", "GASTO_EDU", "LIBERTY", "DESEMPLEO")
+dataza2020[, numerica2020] = lapply (dataza2020[, numerica2020], as.numeric) # se puede cambiar el as.factor por numeric
+```
+
+```{r}
+datos_usar <- dataza2020 %>% select(-c(5, 10))
+```
+
+```{r}
+# Cambiar la monotonía de la variable "Desempleo"
+
+valor_min1 <- min(datos_usar$DESEMPLEO, na.rm = TRUE)
+valor_max1 <- max(datos_usar$DESEMPLEO, na.rm = TRUE)
+
+# Transformación
+datos_usar$DESEMPLEO <- valor_max1 - datos_usar$DESEMPLEO + valor_min1
+
+```
+
+```{r}
+# Ordenar los datos por CPI
+dataza2020_sorted <- dataza2020[order(-dataza2020$CPI), ]
+```
+
+```{r}
+#Hacemos la misma modificación para la data que usaremos para la gráfica del mapa
+valor_min2 <- min(dataza2020_sorted$DESEMPLEO, na.rm = TRUE)
+valor_max2 <- max(dataza2020_sorted$DESEMPLEO, na.rm = TRUE)
+
+dataza2020_sorted$DESEMPLEO <- valor_max2 - dataza2020_sorted$DESEMPLEO + valor_min2
+```
+
+```{r}
+# Seleccionar los 10 primeros países -> tener una primera visión de la variable 
+top_10 <- dataza2020_sorted[1:10, ]
+```
+
+```{r}
+# librerías para el mapa
+library(sf)
+library(rnaturalearth)
+```
+
+```{r}
+# Cargar datos geográficos mundiales
+library(rnaturalearthdata)
+world <- ne_countries(scale = "medium", returnclass = "sf")
+```
+
+```{r}
+# Aseguramos que los nombres de países coincidan con las del mapa quitando acentos y minísculas
+dataza2020$CODE <- toupper(dataza2020$CODE)
+```
+
+```{r}
+# Unir datos geográficos con nuestros datos
+map_data = world |>
+  left_join(dataza2020, by = c("iso_a3" = "CODE"))
+```
+
+```{r}
+# Creamos el mapa usando CPI como variable
+p <- ggplot(map_data) +
+  geom_sf(aes(fill = CPI), color = "white", lwd = 0.2) +
+  scale_fill_viridis_c(option = "plasma", na.value = "grey80") + #colores para cambiar el mapa
+  labs(title = "Índice de Percepción de Corrupción (CPI) por País",
+       fill = "CPI") +
+  theme_minimal()
+```
+
+```{r}
+# Librería para CORRELACIONES
+library(polycor)
+library(ggcorrplot)
+```
+
+```{r}
+# Limpiamos data para las correlaciones
+dontselect1=c("PAIS","CODE","GASTO_EDU","POB_TOTAL")
+```
+
+```{r}
+select1=setdiff(names(dataza2020),dontselect1) 
+theData1=dataza2020[,select1]
+```
+
+```{r}
+# Cambiamos la monotonái de Desempleo para las correlaciones
+valor_min4 <- min(theData1$DESEMPLEO, na.rm = TRUE)
+valor_max4 <- max(theData1$DESEMPLEO, na.rm = TRUE)
+
+theData1$DESEMPLEO <- valor_max4 - theData1$DESEMPLEO + valor_min4
+```
+
+```{r}
+# Matriz de correlación para el ANALISIS MULTIVARIADO
+corMatrix1=polycor::hetcor(theData1)$correlations
+```
+
+```{r}
+# Eliminamos varibales que no vamos a usar  
+dontselect=c("PAIS","CODE","GASTO_EDU","POB_TOTAL", "CPI")
+```
+
+```{r}
+# Data para el ANALISIS FACTORIAL
+select=setdiff(names(dataza2020),dontselect) 
+theData=dataza2020[,select]
+```
+
+```{r}
+theData = na.omit(theData)
+```
+
+```{r}
+# Cambio de monotponía - Análisis factorial
+valor_min <- min(theData$DESEMPLEO, na.rm = TRUE)
+valor_max <- max(theData$DESEMPLEO, na.rm = TRUE)
+
+theData$DESEMPLEO <- valor_max - theData$DESEMPLEO + valor_min
+```
+
+```{r}
+# Análisis de correlación para el ANALISIS FACTORIAL
+corMatrix=polycor::hetcor(theData)$correlations
+```
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+# Librerías para factores
+library(psych) 
+library(factoextra)
+library(GPArotation)
+```
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+# Rotación con VARIMAX
+resfa <- fa(theData,
+            nfactors = 2,
+            cor = 'mixed',
+            rotate = "varimax", #oblimin?
+            fm="minres")
+```
+
+```{r}
+# Rotación con OBLIMIN
+resfa2 <- fa(theData,
+            nfactors = 2,
+            cor = 'mixed',
+            rotate = "oblimin", #oblimin?
+            fm="minres")
+```
+
+```{r}
+# Guardamos el MR2
+theData$MR2=resfa$scores[,2]
+```
+
+```{r}
+# Creamos una nueva data para ver la correlación entre el CPI y el MR2
+data_clean <- na.omit(theData1)
+```
+
+```{r}
+# Nueva data
+data_clean$MR2=resfa$scores[,2]
+```
+
+```{r}
+corMatrix3=polycor::hetcor(theData)$correlations
+```
+
+```{r}
+# Análisis Cluster
+library(cluster)
+library(kableExtra)
+library(ggrepel)
+library(BBmisc)
+library(factoextra)
+```
+
+```{r}
+# Data para el análisis Cluster
+datos_usar_na <- na.omit(datos_usar)
+```
+
+```{r}
+dataClus=datos_usar_na[,c(4:8)]
+row.names(dataClus)=datos_usar_na$PAIS
+```
+
+```{r}
+dataClus <- as.data.frame(scale(dataClus))
+```
+
+```{r}
+# G.dist distance
+g.dist = daisy(dataClus, metric="gower")
+```
+
+```{r}
+#Número de clusters PAM
+#fviz_nbclust(dataClus, pam,diss=g.dist,method = "gap_stat",k.max = 10,verbose = F)
+```
+
+```{r}
+# PAM
+set.seed(123)
+res.pam=pam(g.dist,7,cluster.only = F)
+#nueva columna
+dataClus$pam=res.pam$cluster
+```
+
+```{r}
+# Data pam
+silPAM=data.frame(res.pam$silinfo$widths)
+silPAM$PAIS=row.names(silPAM)
+poorPAM=silPAM[silPAM$sil_width<0,'PAIS']%>%sort()
+```
+
+```{r}
+# Datos PAM nefastos
+datos_usar_na$pamIPCpoor=datos_usar_na$PAIS%in%poorPAM
+datos_usar_na$pamIPC=as.ordered(dataClus$pam)
+```
+
+```{r}
+# Número de Clusters Agnes
+#fviz_nbclust(dataClus, hcut,diss=g.dist,method = "gap_stat",k.max = 10,verbose = F,hc_func = "agnes")
+```
+
+```{r}
+# AGNES
+set.seed(123)
+res.agnes<- hcut(g.dist, k = 7,hc_func='agnes',hc_method = "ward.D")
+dataClus$agnes=res.agnes$cluster
+```
+
+```{r}
+# Datos nefastos AGNES
+silAGNES=data.frame(res.agnes$silinfo$widths)
+silAGNES$PAIS=row.names(silAGNES)
+poorAGNES=silAGNES[silAGNES$sil_width<0,'PAIS']%>%sort()
+```
+
+```{r}
+#Número de Clusters Diana
+#fviz_nbclust(dataClus, hcut,diss=g.dist,method = "gap_stat",k.max = 10,verbose = F,hc_func = "diana")
+```
+
+```{r}
+paragraf = dataClus
+```
+
+```{r}
+# DIANA
+set.seed(123)
+res.diana <- hcut(g.dist, k = 5,hc_func='diana')
+dataClus$diana=res.diana$cluster
+```
+
+```{r}
+# Datos nefastos DIANA
+silDIANA=data.frame(res.diana$silinfo$widths)
+silDIANA$PAIS=row.names(silDIANA)
+poorDIANA=silDIANA[silDIANA$sil_width<0,'PAIS']%>%sort()
+```
+
+```{r}
+# Data para medias AGNES
+medias = dataClus
+```
+
+```{r}
+# Proyección multidimensional para gráfico
+proyeccion = cmdscale(g.dist, k=2,add = T) 
+```
+
+```{r}
+# data frame prep:
+datos_usar_na$dim1 <- proyeccion$points[,1]
+datos_usar_na$dim2 <- proyeccion$points[,2]
+```
+
+```{r}
+#Gráfico de barras TOP 10
+barra <- ggplot(top_10, aes(x = reorder(PAIS, -CPI), y = CPI)) + 
+  geom_bar(stat = "identity", fill = "red") + 
+  geom_text(aes(label = CPI), vjust = -0.3) +  # Añade etiquetas con los valores
+  labs(title = "TOP 10 COUNTRIES BY CORRUPTION PERCEPTION INDEX (CPI)",
+       x = "PAIS", y = "CPI") + 
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+# Gráfico lineal sobre la relación entre el PBI y CPI
+scatter_plot <- ggplot(dataza2020_sorted, aes(x = PBI, y = CPI)) + 
+  geom_point(size = 2, shape = 21, fill = "red") +  # Personalizar el tamaño y forma de los puntos
+  labs(
+    title = "Relación entre el Índice de Percepción de Corrupción (CPI) y el PBI",
+    x = "Producto Bruto Interno (PBI)",
+    y = "Índice de Percepción de Corrupción (CPI)"
+  ) +
+  theme_minimal()
+```
+
+
+```{r}
+# Correlación entre el MR2 y el CPI
+scatter_plot2 <- ggplot(data_clean, aes(x = MR2, y = CPI)) + 
+  geom_point(size = 2, shape = 21, fill = "red") +  # Personalizar el tamaño y forma de los puntos
+  labs(
+    title = "Relación entre MR2 e IPC",
+    x = "MR2",
+    y = "Índice de percepción de corrupción"
+  ) +
+  theme_minimal()
+```
+
+ÍNDICE DE PERCEPCIÓN DE CORRUPCIÓN {data-icon="fa-table"}
+===================================== 
+Column {data-width=700} {.tabset}
+----------------------------------------------------------------------- 
+
+### TOP 10 CPI
+    
+```{r}
+# Convertir el gráfico a uno interactivo con plotly
+library(plotly)
+ggplotly(barra)
+```
+
+> Observaciones: esta gráfica representa a los 10 países mejores clasificados según el CPI, esta varibales mide el nivel percibido de corrupción en el sector público, donde una puntuación más alta (en una escala del 0 al 100) indica un menor nivel de corrución percibida.
+
+### MAPA MUNDIAL CPI
+
+```{r}
+ggplotly(p)
+```
+
+> Observaciones: Podemos reonocer que los países de Europa occidentales y nórdicos entablan los espacios con mejor CPI a nivel mundial. Mientras que gran parte de äfrica, América Central, Sudamérica y Asia central representa los espacios con menor IPC.
+
+Column {data-width=300} {.tabset}
+-----------------------------------------------------------------------
+
+### INDICE DE PERCEPCIÓN DE LA CORRUPCIÓN
+
+El CPI es una medida que evalúa el impacto de las variables socioeconómicas en la percepción de la corrupción. Este índice busca validar la hipótesis de que un mayor desarrollo socioeconómico puede contribuir a la reducción de los niveles de corrupción. De lo contrario, será necesario reconocer que la realidad es más compleja que las expectativas predispuestas sobre los factores influyentes.
+
+TEMA DE INVESTIGACIÓN:  Impacto del desarrollo socioeconómico en los niveles de corrupción a nivel mundial.
+
+```{r}
+# data frame con el resumen de variables
+variable_summary <- data.frame(
+  Variable = c("PAIS", "CODE", "CPI", "PBI", "EFECTIVIDAD", "LIBERTY", "ESPERANZA", "DESEMPLEO"),
+  Tipo = c("Categórica", "Categórica", "Numérica", "Numérica", "Numérica", "Numérica", "Numérica", "Numérica"),
+  Escala = c("Nominal", "Nominal", "Continua", "Continua", "Continua", "Continua", "Continua", "Continua")
+)
+
+library(magrittr)
+head(variable_summary, 10)%>%
+    rmarkdown::paged_table()
+```
+
+> (Transparency International, 2022).
+
+### GRÁFICO
+
+```{r}
+ggplotly(scatter_plot)
+```
+
+> Observaciones: Se considera el uso del PBI como primer eje para entender la relación entre el CPI y los factores económicos bases.Estos resultados refuezan la idea que un mayor desarrollo económico está relacionado con una mejor percepción de transparencia en el sector público, sin embargo, hay casos atípicos que demuentran lo contrario.
+
+### REGRESIÓN LINEAL MÚLTIPLE
+
+```{r}
+modelo4=formula(scale(CPI)~ scale(PBI))
+
+modelo4_=lm(modelo4,data=dataza2020_sorted)
+
+modelo4_N=list('CPI (I)'=modelo4_)
+modelsummary(modelo4_N, title = "Regresion lineal múltiple",
+             stars = TRUE,
+             output = "kableExtra") # para que se vean mejor el gráfico
+```
+
+> Interpretación: el coeficiente de relación es positivo y significativo a un 0.001, el R² ajustado es 0.627, ligeramente menor al R², pero aún muestra un ajuste sólido al modelo. Si bien es cierto, se tiene un buen porcentaje de explicación, hay un 37% de variabilidad que puede depende de otros factores no económicos.
+
+CORRELACIÓN Y ANÁLISIS FACTORIAL {data-icon="fa-table"}
+=====================================     
+Column {data-width=500} {.tabset}
+----------------------------------------------------------------------- 
+### MODELO DE CORRELACIÓN 
+    
+```{r}
+ggcorrplot(corMatrix1)
+```
+
+>Interpretación:podemos observamos una fuerte correlación positiva entre el PBI y el CPI, lo que refuerza la idea de que economías más desarrolladas tienden a tener menor corrupción percibida. Además, el PBI también está altamente correlacionado con la Efectividad y Liberty, lo que sugiere que economías más ricas suelen tener instituciones más efectivas y mayor libertad. Por otro lado, el Desempleo muestra una correlación de nivel bajo con la mayoría de las variables. Finalmente, la Esperanza se correlaciona moderadamente con el CPI y el PBI, indicando que las economías con menos corrupción y más riqueza tienden a asociarse con una mayor expectativa de vida o bienestar general.
+
+### ANÁLISIS BIVARIADO:
+
+```{r}
+# Calcular la matriz de correlación
+matriz_correlacion <- cor(theData1, use = "complete.obs", method = "pearson")
+
+# Visualizar la matriz de correlación con números 
+corrplot(matriz_correlacion, method = "number", type = "upper", 
+         tl.col = "black", tl.srt = 45, number.cex = 0.8)
+```
+
+>Interpretación: la matriz de correlación muestra una fuerte relación positiva entre el CPI y variables como PBI (0.81), Efectividad (0.91) y Esperanza (0.73), indicando que mayor riqueza, institucionalidad y bienestar están asociados con menor corrupción percibida. Liberty tiene una correlación positiva moderada con el CPI (0.59). El Desempleo, por su parte, tiene relaciones muy débiles o casi nulas con todas las variables. En general, el CPI está estrechamente vinculado a indicadores de desarrollo económico y efectividad institucional.
+
+Column {data-width=500} {.tabset}
+-----------------------------------------------------------------------     
+
+### MODELO DE FACTORIZACIÓN 
+
+```{r}
+fa.diagram(resfa,main = "Resultados del EFA")
+```
+
+> CONSIDERACIONES: Podemos reconocer q  ue las variables independientes se agrupan en dos factores principales. El primer factor (MR1) está compuesto por una fuerte relación entre Esperanza de vida. El segundo factor (MR2) refleja una asociación entre la Efectividad (0.7), PBI (0.7) y Libertad de Prensa (0.5) Libertad, crenado un nuevo factor alineado a la Gobernanaza y Desarrollo Democrático. Asimismo, es notable que la variable Desempleo no se alinee claramente con ninguno de los dos factores, lo que sugiere que esta podría estar influenciada por dinámicas diferentes a las capturadas por los factores principales.
+
+### INTERPRETACIÓN:
+
+```{r}
+print(resfa$loadings)
+```
+
+BARTLETT:
+```{r}
+cortest.bartlett(corMatrix,n=nrow(theData))$p.value>0.05
+```
+
+SINGULAR:
+```{r}
+library(matrixcalc)
+is.singular.matrix(corMatrix)
+```
+
+NÚMERO DE FACTORES
+```{r}
+fa.parallel(theData, fa = 'fa',correct = T,plot = F)
+```
+
+VARIMAX
+```{r}
+print(resfa$loadings)
+```
+
+OBLIMIN
+```{r}
+print(resfa2$loadings)
+```
+
+> Interpretación: Para llegar a estos resultados, tenemos que tener en cuenta que tanto los test de singular y Bartlett nos salieron "False", por lo tanto pudimos seguir con el anális. Asimismo, podemos observar que el segundo factor tiene un acumluative var mayor que el primero (0.583), dandonos más nivel explicativo. Este análisis sugiere la existencia de dos dimensiones interpretables (parallel), asimismo aplicando la Rotación tanto con el VARIMAX Y OBLIMIN, reocnocemos que la rotación VARIMAX tiene una mejor varianza explicativa acumulada en el MR2 (58.3%).
+
+### CORRELACIÓN CON MR2
+```{r}
+ggplotly(scatter_plot2)
+```
+
+>Interpretación: el gráfico confirma que el desarrollo económico y la libertad (MR2) están estrechamente vinculados con una menor percepción de corrupción.Países con altos niveles de desarrollo socioeconómico tienden a tener instituciones más transparentes y una gobernanza más efectiva, mientras que en niveles bajos de desarrollo socioeconómico la percepción de corrupción es más variable.
+
+### REGRESIÓN LINEAL MÚLTIPLE
+
+```{r}
+modelo3=formula(scale(CPI)~scale(MR2))
+
+modelo3_=lm(modelo3,data=data_clean)
+
+modelo3_N=list('CPI (I)'=modelo3_)
+modelsummary(modelo3_N, title = "Regresion lineal múltiple",
+             stars = TRUE,
+
+                          output = "kableExtra") # para que se vean mejor el gráfico
+```
+
+>Interpretación: ahora bien, para considerar si este nuevo factor puede reemplazar realizamos una regresión lineal, donde reconocemos que el R ajustado explica un 66.6%, por lo que podemos considerarlo como una opción, sin embargo, estas variables tienen un mejor nivel de correlación por separado (PBI 0.81, EFECTIVIDAD 0.91, LIBERTAD 0.59). 
+
+FACTORIZACIÓN CLUSTER {data-icon="fa-table"}
+=====================================     
+Column {data-width=500} {.tabset}
+-----------------------------------------------------------------------
+
+### EVALUACIÓN PAM:
+
+```{r}
+fviz_silhouette(res.pam,print.summary = F)
+```
+
+>Interpretación: el gráfico de silueta Pam evalúa la calidad de los clústers, donde el porcentaje es de 27%, indicando una baja distribución en los clustres (considerando que los valores ideales suelen ser mayores a 0.5). Asismo, algunos puntos tienen valores negativos o muy bajos, lo que sugiere que están mal clusterizados. En este sentido, los clusters no están bien definidos y es posible que haya solapamiento significativo entre ellos. 
+
+### EVALUACIÓN AGNES:
+
+```{r}
+# EVALUACION MODELO AGNES:
+fviz_silhouette(res.agnes,print.summary = F)
+```
+
+>Interpretación: el gráfico de siluetas del modelo AGNES muestra un promedio de silueta de 27%, lo que indica una calidad de agrupamiento baja, con clusters poco definidos y un considerable solapamiento entre ellos. El promedio del gráfico es igual al modelo modelo PAM (0.27), donde, varios puntos tienen valores de silueta negativos o bajos, sugiriendo asignaciones incorrectas en los clústeres.
+
+### EVALUACIÓN DIANA:
+```{r}
+# EVALUACION: DIANA
+fviz_silhouette(res.diana,print.summary = F)
+```
+
+> Interpretación: El gráfico de siluetas muestra una calidad de agrupamiento con un promedio de silueta de 0.28, lo que indica una leve mejora respecto a los modelos anteriores,pero sigue siendo bajo y sugiere que los clústeres no están bien definidos (EL MEJOR MODELO).
+
+Column {data-width=500} {.tabset}
+----------------------------------------------------------------------- 
+
+### INTERPRETACIÓN: 
+
+```{r}
+fviz_nbclust(paragraf, hcut,diss=g.dist,method = "gap_stat",k.max = 10,verbose = F,hc_func = "diana")
+```   
+KAISERMEYER - OLKIN
+```{r}
+psych::KMO(corMatrix) 
+```
+
+> Interpretación: El gráfico muestra que el número óptimo de clústeres es 5, determinado por el punto de corte donde la estadística DIANA alcanza el mejor valor. Asismismo, el resultado de KMO = 0.75 sugiere que los datos son adecuados para el análisis factorial. Sin embargo, se debe tomar en cuenta el predictor "Efectividad", ya que muestra un porcentaje ligeramente más débil en comparación con las demás variables. Aún así, el análisis factorial puede proceder con estos datos.
+
+### PROMEDIOS DE MEDIAS:
+
+```{r}
+aggregate(.~ diana, data=medias,mean)
+```
+
+>Interpretación: (1) Los clusters representan la organización de los países. En el primer cluster presenta varlores negativos en casi todas las variables, lo que indica un grupo con bajo desarrollo económico e institucional, así como un nivel de esperanza significativamente bajo y un desempleo elevado (estos resultados son similares en el cluster "5", agrupan los casos más desafiantes, con bajos niveles de desarrollo en casi todas las dimensiones.). (2) El segundo cluster represente un grupo de países en transición, sin valores extremos en ninguna dimensión, teniendo valores promeidos en PBI y Efectivdad, además de tener un valor de Esperanza neutral. (3) El tercer cluster representa  los países más desarrollados y con mejores métricas generales, destacando diferencias entre ellos en términso de desarrollo y bienestar. (4) Por último, el cuarto cluster presentva valores más positivos que los clusters 1,2 y 5, sugiriendo un vivel intermedio de desarollo con miras a alcanzar el grupo de países que se encuentren en el cluster 3. (5) Este desarrollo nos sirve para tener un mejor panorama de cómo se encuentrana grupados los países que empleado en nuestro análisis.
+
+### GRÁFICO CLUSTER
+
+```{r}
+# Data diana
+datos_usar_na$dianaIPCpoor=datos_usar_na$PAIS%in%poorDIANA
+datos_usar_na$dianaIPC=as.ordered(dataClus$diana)
+dataClus$diana=NULL
+```
+
+```{r}
+DIANAlabels=ifelse(datos_usar_na$dianaIPCpoor,datos_usar_na$PAIS,'')
+```
+
+```{r}
+# Gráfico DINA
+base= ggplot(datos_usar_na,aes(x=dim1, y=dim2,label=row.names(dataClus)))
+dianaPlot= base + geom_point(size=3,
+                            aes(color=dianaIPC)) + 
+          labs(title = "DIANA")
+
+# hacer notorios los paises mal clusterizados
+dianaPlot + geom_text_repel(size=4,
+                            aes(label=DIANAlabels), 
+                            max.overlaps = 50,
+                            min.segment.length = unit(0, 'lines'))
+```
+PAÍSES MAL CLUSTERIZADOS:
+```{r}
+silDIANA=data.frame(res.diana$silinfo$widths)
+silDIANA$PAIS=row.names(silDIANA)
+poorDIANA=silDIANA[silDIANA$sil_width<0,'PAIS']%>%sort()
+poorDIANA
+```
+
+>CONSIDERACIONES: Dentro de este gráfico se pueden observar países como GHANA (grupo 1) están aislados de su cluster principal, lo que podría indicar una asignación errónea. De manera similar, OMAN (grupo 3) e IRAN (grupo 2) se encuentran próximos a límites con otros clusters, lo que sugiere fronteras difusas. Estas observaciones reflejan que, aunque el modelo capta patrones generales, existen casos específicos que podrían requerir ajustes en los parámetros o una reevaluación de las variables utilizadas para mejorar la cohesión y la separación entre clusters.
+
+REGRESIÓN LINEAL {data-icon="fa-table"}
+=====================================     
+Column {data-width=500} {.tabset}
+-----------------------------------------------------------------------
+
+### REGRESIÓN LINEAL MÚLTIPLE
+
+```{r}
+modelo1 <- lm(CPI ~PBI + EFECTIVIDAD + LIBERTY + ESPERANZA + DESEMPLEO + POB_TOTAL, data = dataza2020_sorted)
+```
+
+```{r}
+modelo2=list('CPI (I)'=modelo1)
+modelsummary(modelo1, title = "Regresion lineal múltiple",
+             stars = TRUE,
+             output = "kableExtra") # para que se vean mejor el gráfico
+```
+
+>INTERPRETACIÓN: Este modelo es válido, ya que el valor del estadístico F (p < 0.001) permite rechazar la hipótesis nula, lo que confirma que al menos una de las variables independientes tiene un efecto significativo sobre la variable dependiente. El R-cuadrado ajustado muestra que el modelo explica el 88.7% de la variabilidad en la variable dependiente, indicando un excelente nivel de ajuste. Entre las variables independientes, EFECTIVIDAD es la más relevante con un coeficiente de 0.454 y un nivel de significancia de p < 0.001, seguida por LIBERTY (0.187) y PBI (0.000), que también son altamente significativas. Por el contrario, las variables ESPERANZA, DESEMPLEO y POB_TOTAL no presentan una influencia estadísticamente significativa (p > 0.05). En general, el modelo es estadísticamente robusto y resalta la importancia de EFECTIVIDAD como factor clave en la explicación de la variabilidad de la variable dependiente.
+
+### REGRESIÓN LINEAL MÚLTIPLE ESTANDARIZADO
+
+```{r}
+# regre múltiple con datos standarizados
+modelo1_st=formula(scale(CPI)~scale(PBI)+scale(EFECTIVIDAD)+scale(LIBERTY)+scale( ESPERANZA)+scale( DESEMPLEO) +scale(POB_TOTAL))
+
+modelo1_st=lm(modelo1_st,data=dataza2020_sorted)
+
+modelo2_st=list('CPI (I)'=modelo1_st)
+modelsummary(modelo2_st, title = "Regresion lineal múltiple",
+             stars = TRUE,
+             output = "kableExtra") # para que se vean mejor el gráfico
+```
+
+> CONSIDERACIONES: A pesar de estandarizar las variables, los resultados del modelo se mantienen consistentes con los obtenidos previamente. La importancia relativa de las variables no parece haber cambiado significativamente, destacándose EFECTIVIDAD, PBI y LIBERTY como las más influyentes, mientras que ESPERANZA, DESEMPLEO y POB_TOTAL continúan sin aportar significativamente al modelo. Esto indica que la estandarización no altera las conclusiones generales sobre las relaciones entre las variables y su influencia en CPI.
+
+### GRÁFICO COMPARATIVO
+
+```{r}
+plot_models(modelo1,modelo1_st,vline.color = "black",m.labels=c("Modelo 1","Modelo 1 estandarizado"),dot.size = 1,line.size = 0.6)
+```
+
+>CONSIDERACIONES: Mediante la estandarización tenemos una mejor percepción sobre las variables independedientes. Reconocemos que la variable PBI se vuelve sigfinicativa cuando se estanadatiza, ya que no pasa por el CERO.
+
+Column {data-width=500} {.tabset}
+----------------------------------------------------------------------- 
+
+### LINEALIDAD 
+
+```{r}
+plot(modelo1, 1)
+```
+
+>INTERPRETACIÓN: los residuos están distribuidos de forma mayormente aleatoria alrededor de la línea horizontal (valor 0), indicando que el modelo captura razonablemente bien la relación lineal entre las variables. Sin embargo, la ligera curvatura en la línea roja suavizada sugiere posibles desviaciones de la linealidad en ciertas regiones. Además, se observan valores atípicos destacados (como los puntos 16, 19 y 119) que podrían estar influyendo en el ajuste del modelo y deben investigarse más a fondo. La dispersión de los residuos parece relativamente constante, lo que apoya la suposición de homocedasticidad. En general, el modelo es adecuado, pero se recomienda un análisis adicional para confirmar la validez de las suposiciones y el impacto de los valores atípicos.
+ 
+### NORMALIDAD DE RESIDUOS
+
+```{r}
+qqnorm(modelo1_st$residuals)
+```
+SHAPIRO TEST:
+```{r}
+shapiro.test(modelo1_st$residuals)
+```
+
+>INTERPRETACIÓN: El gráfico Quantile-Quantile evalúa si los residuos del modelo siguen una distribución normal. La mayor parte de los puntos sigue aproximadamente la línea diagonal, lo que indica que los residuos se distribuyen de forma cercana a la normalidad. Sin embargo, hay desviaciones en las colas, especialmente en los extremos superior e inferior, donde algunos puntos se alejan significativamente de la línea. Esto sugiere la presencia de posibles valores atípicos o una ligera desviación de la normalidad en los residuos. Si bien la normalidad no es estrictamente necesaria para la regresión, estos resultados podrían influir en los intervalos de confianza y pruebas de hipótesis, por lo que es recomendable realizar una prueba estadística (como Shapiro-Wilk) para confirmar este comportamiento.
+
+### HOMOCEDASTICIDAD
+
+```{r}
+plot(modelo1_st, 3)
+```
+BREUSCH-PAGAN TEST
+```{r}
+library(lmtest)
+bptest(modelo1_st)
+```
+
+>INTERPRETACIÓN: El resultado  muestra un p-valor de 0.2641, lo cual es mayor al nivel de significancia típico de 0.05. Esto indica que no se rechaza la hipótesis nula de homocedasticidad, lo que sugiere que no hay evidencia de varianza no constante en los residuos del modelo. Por lo tanto, el supuesto de homocedasticidad se cumple, y no hay indicios de que la variabilidad de los errores dependa de las variables independientes.
+
+### NO MULTICOLINEALIDAD
+
+```{r}
+library(DescTools)
+# > 5 es problematico
+VIF(modelo1_st) %>%kable(col.names = "VIF",caption ="Evaluando Multicolinealidad usando VIF (Variance Inflation Factors)" )%>%kable_styling(full_width = F)
+```
+
+>Interpretación: no se presenta colinealidad severa en las variables, ya que todas tienen valores de VIF por debajo de 5. El modelo es adecuado, aunque se podría tomar en cuenta la varibale "Efectividad", ya que presenta el mayor VIF. Esto asegura que las variables contribuyen de manera independiente al modelo sin interferir significativamente entre sí.
+
+### VALORES INFLUYENTES
+```{r}
+plot(modelo1_st, 5)
+```
+
+>Interpretación: Observaciones como 151, 97 y 34 tienen valores altos de leverage o residuos estandarizados significativos, lo que las convierte en casos potencialmente influyentes para el modelo. El punto 34 está cerca de las líneas de Cook, lo que sugiere que podría tener un impacto significativo en los coeficientes del modelo.
