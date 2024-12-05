@@ -1,0 +1,484 @@
+---
+title: "data2"
+author: "Daniel Sánchez"
+date: "2024-09-28"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE}
+library(rio)
+library(dplyr)
+library(tidyverse)
+```
+
+
+# ESPERANZA
+
+```{r message=FALSE, warning=FALSE}
+educa = import("EDUCACION.xls")
+```
+
+```{r}
+names(educa)[1] = "PAIS"
+names(educa)[2] = "CODE"
+names(educa)[65] ="GASTO_EDU"
+```
+
+```{r}
+educa = educa[-c(1:3),]
+```
+
+
+```{r}
+str(educa$GASTO_EDU)
+```
+```{r}
+str(educa)
+```
+
+```{r}
+educa_ok =educa[, c(1,2,65)]
+```
+
+```{r}
+educa_ok
+```
+
+```{r}
+library(scraEP)
+
+educa_ok[,1]=sapply(educa_ok[,1],unaccent)
+```
+
+```{r}
+educa_ok[,1]=sapply(educa_ok[,1],toupper)
+```
+
+```{r}
+str(educa_ok$GASTO_EDU)
+```
+
+```{r}
+educa_ok$GASTO_EDU=readr::parse_number(educa_ok$GASTO_EDU,locale = readr::locale(decimal_mark = "."))
+```
+
+```{r}
+str(educa_ok)
+```
+```{r}
+educa_ok[,3] <- round(educa_ok[,3], 1)
+```
+
+
+```{r}
+educa_ok = educa_ok |>
+  arrange(CODE)
+```
+
+```{r}
+educa_ok <- educa_ok[!is.na(educa_ok$PAIS), ]
+```
+
+# ESPERANZA DE VIDA:
+
+```{r}
+nacer = import("NACER.xls")
+```
+
+```{r}
+names(nacer)[1] = "PAIS"
+names(nacer)[65] = "ESPERANZA"
+```
+
+```{r}
+str(nacer)
+```
+
+```{r}
+nacer = nacer[-c(1:3),]
+```
+
+```{r}
+nacer_ok =nacer[, c(1,65)]
+```
+
+```{r}
+
+nacer_ok[,1]=sapply(nacer_ok[,1],unaccent)
+```
+
+```{r}
+nacer_ok[,1]=sapply(nacer_ok[,1],toupper)
+```
+
+```{r}
+nacer_ok$ESPERANZA=readr::parse_number(nacer_ok$ESPERANZA,locale = readr::locale(decimal_mark = "."))
+```
+
+```{r}
+nacer_ok[,2] <- round(nacer_ok[,2], 2)
+```
+
+```{r}
+str(nacer_ok$ESPERANZA)
+```
+
+```{r}
+nacer_ok = nacer_ok |>
+  arrange(PAIS)
+```
+
+```{r}
+nacer_ok <- nacer_ok[!is.na(nacer_ok$PAIS), ]
+```
+
+```{r}
+allData=merge(educa_ok,nacer_ok, by = "PAIS")
+head(allData)
+```
+
+
+## dejar como na
+
+## in.na
+
+## IPC
+
+```{r message=FALSE, warning=FALSE}
+cpi = import("CPI2020.xlsx")
+```
+
+```{r}
+names(cpi) [2] = "CODE"
+names(cpi)[4] = "CPI"
+```
+
+```{r}
+str(cpi)
+```
+
+```{r}
+cpi = cpi[-c(1:2),]
+```
+
+```{r}
+cpi_ok =cpi[, c(2,4)]
+```
+
+```{r}
+str(cpi_ok$CPI)
+```
+```{r}
+cpi_ok$CPI = as.numeric(cpi_ok$CPI)
+```
+
+```{r}
+str(cpi_ok$CPI)
+```
+```{r}
+allData=merge(allData,cpi_ok,all.x = T,by='CODE')
+```
+
+## DESEMPLEO
+
+```{r message=FALSE, warning=FALSE}
+desempleo = import("DESEMPLEO.xls")
+```
+
+```{r}
+names(desempleo)[1] = "PAIS"
+names(desempleo)[65] = "DESEMPLEO"
+```
+
+```{r message=FALSE, warning=FALSE}
+str(desempleo)
+```
+
+```{r}
+desempleo = desempleo[-c(1:3),]
+```
+
+```{r}
+desempleo_ok =desempleo[, c(1,65)]
+```
+
+```{r}
+desempleo_ok$DESEMPLEO=readr::parse_number(desempleo_ok$DESEMPLEO,locale = readr::locale(decimal_mark = "."))
+```
+
+```{r}
+desempleo_ok[,2] <- round(desempleo_ok[,2], 1)
+```
+
+```{r}
+str(desempleo_ok$DESEMPLEO)
+```
+```{r}
+
+desempleo_ok[,1]=sapply(desempleo_ok[,1],unaccent)
+```
+
+```{r}
+desempleo_ok[,1]=sapply(desempleo_ok[,1],toupper)
+```
+
+```{r}
+desempleo_ok = desempleo_ok |>
+  arrange(PAIS)
+```
+
+
+```{r}
+desempleo_ok <- desempleo_ok[!is.na(desempleo_ok$PAIS), ]
+```
+
+```{r}
+allData=merge(allData,desempleo_ok,all.x = T,by='PAIS')
+```
+
+## PBI
+
+```{r message=FALSE, warning=FALSE}
+pbi = import("PBI.xls")
+```
+
+```{r}
+names(pbi)[1] = "PAIS"
+names(pbi)[65] = "PBI"
+```
+
+```{r message=FALSE, warning=FALSE}
+str(pbi)
+```
+
+```{r}
+pbi = pbi[-c(1:3),]
+```
+
+```{r}
+pbi_ok =pbi[, c(1,65)]
+```
+
+```{r}
+pbi_ok$PBI=readr::parse_number(pbi_ok$PBI,locale = readr::locale(decimal_mark = "."))
+```
+
+```{r}
+str(pbi_ok$PBI)
+```
+
+```{r}
+pbi_ok[,1]=sapply(pbi_ok[,1],unaccent)
+```
+
+```{r}
+pbi_ok[,1]=sapply(pbi_ok[,1],toupper)
+```
+
+```{r}
+desempleo_ok = desempleo_ok |>
+  arrange(PAIS)
+```
+
+
+```{r}
+pbi_ok <- pbi_ok[!is.na(pbi_ok$PAIS), ]
+```
+
+```{r}
+allData=merge(allData,pbi_ok,all.x = T,by='PAIS')
+```
+
+## EFECTIVIDAD
+
+```{r message=FALSE, warning=FALSE}
+efec = import("EFECTIVIDAD.xls")
+```
+
+```{r}
+names(efec)[1] = "PAIS"
+names(efec)[65] = "EFECTIVIDAD"
+```
+
+
+```{r}
+efec = efec[-c(1:3),]
+```
+
+```{r}
+efec_ok =efec[, c(1,65)]
+```
+
+```{r}
+efec_ok$EFECTIVIDAD=readr::parse_number(efec_ok$EFECTIVIDAD,locale = readr::locale(decimal_mark = "."))
+```
+
+```{r}
+efec_ok[,2] <- round(efec_ok[,2], 1)
+```
+
+
+```{r}
+efec_ok[,1]=sapply(efec_ok[,1],unaccent)
+```
+
+```{r}
+efec_ok[,1]=sapply(efec_ok[,1],toupper)
+```
+
+```{r}
+efec_ok = efec_ok |>
+  arrange(PAIS)
+```
+
+
+```{r}
+efec_ok <- efec_ok[!is.na(efec_ok$PAIS), ]
+```
+
+```{r}
+allData=merge(allData,efec_ok,all.x = T,by='PAIS')
+```
+
+
+## POB TOTAL
+
+```{r message=FALSE, warning=FALSE}
+pobtotal = import("POBTOTAL.xls")
+```
+
+```{r}
+names(pobtotal)[1] = "PAIS"
+names(pobtotal)[65] = "POB_TOTAL"
+```
+
+
+```{r}
+pobtotal = pobtotal[-c(1:3),]
+```
+
+```{r}
+pobtotal_ok =pobtotal[, c(1,65)]
+```
+
+```{r}
+pobtotal_ok$POB_TOTAL = as.numeric(pobtotal_ok$POB_TOTAL)
+```
+
+```{r}
+pobtotal_ok[,1]=sapply(pobtotal_ok[,1],unaccent)
+```
+
+```{r}
+pobtotal_ok[,1]=sapply(pobtotal_ok[,1],toupper)
+```
+
+```{r}
+pobtotal_ok = pobtotal_ok |>
+  arrange(PAIS)
+```
+
+
+```{r}
+pobtotal_ok <- pobtotal_ok[!is.na(pobtotal_ok$PAIS), ]
+```
+
+```{r}
+allData=merge(allData,pobtotal_ok,all.x = T,by='PAIS')
+```
+
+## LIBERTAD
+
+```{r message=FALSE, warning=FALSE}
+liberty = import("2020.csv")
+```
+
+```{r}
+names(liberty)[2] = "CODE"
+names(liberty)[4] = "LIBERTY"
+```
+
+```{r}
+liberty_ok =liberty[, c(2,4)]
+```
+
+
+```{r}
+liberty_ok$LIBERTY=readr::parse_number(liberty_ok$LIBERTY,locale = readr::locale(decimal_mark = ",", grouping_mark = "."))
+```
+
+```{r}
+str(liberty_ok$LIBERTY)
+```
+
+```{r}
+liberty_ok = liberty_ok |>
+  arrange(CODE)
+```
+
+```{r}
+allData=merge(allData,liberty_ok,all.x = T,by='CODE')
+```
+
+## ordenar toda la data
+
+```{r}
+names(allData)
+```
+
+```{r}
+allData = allData [,c(2,1,5,7,3,8,10,4,6,9)]
+```
+
+```{r}
+table(allData$PAIS)
+```
+```{r}
+allData[allData$PAIS=="IRAN, REPUBLICA ISLAMICA DEL","PAIS"]="IRAN"
+```
+
+
+```{r}
+allData[allData$PAIS=="CONGO, REPUBLICA DEMOCRATICA DEL","PAIS"]="REPUBLICA DEMOCRATICA DEL CONGO"
+```
+
+```{r}
+allData[allData$PAIS=="CONGO, REPUBLICA DEL","PAIS"]="REPUBLICA DEL CONGO"
+```
+
+```{r}
+allData[allData$PAIS=="HONG KONG, REGION ADMINISTRATIVA ESPECIAL","PAIS"]="HONG KONG"
+```
+	
+```{r}
+allData[allData$PAIS=="COREA, REPUBLICA POPULAR DEMOCRATICA DE","PAIS"]="REPUBLICA POPULAR DEMOCRATICA DE COREA"
+```
+
+```{r}
+allData[allData$PAIS=="COREA, REPUBLICA DE","PAIS"]="REPUBLICA DE COREA"
+```
+
+
+```{r}
+allData[allData$PAIS=="YEMEN, REP. DEL","PAIS"]="YEMEN"
+```
+
+```{r}
+allData[allData$PAIS=="EGIPTO, REPUBLICA ARABE DE","PAIS"]="EGIPTO"
+```
+
+```{r}
+allData = allData |>
+  filter(!is.na(CPI))
+```
+
+```{r}
+allData = allData |>
+  arrange(PAIS)
+```
+
+```{r}
+write.csv(allData,"allData.csv",row.names = F)
+```
+
+
